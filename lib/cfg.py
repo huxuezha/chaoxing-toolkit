@@ -16,6 +16,7 @@ except Exception:
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # cxkit/
 CONFIG_PATH = os.path.join(HERE, 'config.json')
+LOCAL_PATH = os.path.join(HERE, 'config.local.json')      # 本地覆盖，不进版本库
 COURSES_PATH = os.path.join(HERE, 'courses.json')
 
 _DEFAULTS = {
@@ -43,6 +44,12 @@ def load_config():
             data = json.load(open(CONFIG_PATH, encoding='utf-8'))
         except Exception as e:
             raise SystemExit('config.json 格式错误：%s' % e)
+    # config.local.json 覆盖 config.json，用于放自己的密钥而不污染版本库
+    if os.path.exists(LOCAL_PATH):
+        try:
+            data = _merge(data, json.load(open(LOCAL_PATH, encoding='utf-8')))
+        except Exception as e:
+            raise SystemExit('config.local.json 格式错误：%s' % e)
     return _merge(_DEFAULTS, data)
 
 

@@ -177,15 +177,26 @@ python 环境自检.py
 
 ### 配置
 
-**① `config.json`** —— 填学校域名和 AI 接口密钥：
+**① `config.json`** —— 填学校域名和 AI 接口密钥。下面是本项目实际使用的配置：
 
 ```json
 {
-  "school": { "domain": "your-school.edu.cn" },
+  "school": { "domain": "ppsuc.edu.cn", "name": "中国人民公安大学" },
   "api":    { "key": "sk-...", "base": "https://api.educg.net/v1", "model": "deepseek-v4-flash" },
   "video":  { "speed": 1.5, "gap": 60, "workers": 2 }
 }
 ```
+
+换一所学校只需改 `school` 里的两个字段。`api` 支持任意 OpenAI 兼容接口。
+
+**密钥建议单独放**：新建 `config.local.json`（已在 `.gitignore` 里排除），
+只写你要覆盖的字段，两份配置会递归合并、后者优先：
+
+```json
+{ "api": { "key": "sk-你的真实密钥" } }
+```
+
+这样 `config.json` 可以作为模板一直留在版本库里，不会误提交密钥。
 
 **② 登录** —— 会开一个独立的 Chrome 窗口，和日常浏览器互不影响：
 
