@@ -4,17 +4,18 @@
 做什么：不下载视频、不真正播放，而是像播放器一样，按固定节奏向服务器
 报告「我播到第几秒了」。每次报告都要带一个签名，签名算错服务器直接不认。
 
-三个必须知道的规律（这套代码已经内置）：
-  1. 服务器按「真实时间 × 2」发额度。报得太快（比如 60 秒真实时间报 300 秒）
-     会被拒收，所以速度上限就是 2 倍。
-  2. 上报间隔必须 ≥ 服务器要求的值（第 5 步已经自动读出来了），
+四个必须知道的规律（这套代码已经内置）：
+  1. 有效时长只按「真实流逝时间」计。60 秒里报 +90 秒，服务端只认 60 秒，
+     所以加速没有收益——位置先到片尾，剩下的时长还是得等。1 倍速最省时间。
+  2. 位置到片尾也未必通过：欠的有效时长要在片尾平位重报补齐（见 run_one 收尾段）。
+  3. 上报间隔必须 ≥ 服务器要求的值（第 5 步已经自动读出来了），
      报得太勤会被当成噪音丢掉——进度条满了也不给通过。
-  3. 连续高速跑太久会被临时降额，表现是「突然全都不通过了」。
+  4. 连续高速跑太久会被临时降额，表现是「突然全都不通过了」。
      本脚本会自动降速重试，不用你手动干预。
 
 用法：
   python step6_video.py 268330787                 # 按 config.json 的参数跑
-  python step6_video.py 268330787 --speed 1.5 --workers 2 --gap 60
+  python step6_video.py 268330787 --speed 1 --workers 3 --gap 60
   python step6_video.py 268330787 --state          # 只看状态，不刷
 """
 import hashlib
@@ -59,7 +60,7 @@ def md5enc(clazz, uid, jobid, oid, pt, dur):
 
 
 class Runner:
-    def __init__(self, meta, speed=1.5, gap=60):
+    def __init__(self, meta, speed=1.0, gap=60):
         self.klass = meta['klass']
         self.course = meta['course']
         self.cpi = meta['cpi']
@@ -173,8 +174,11 @@ class Runner:
 
         pt = 0
         if st and st['head'] > 3:
-            log('%s 未通过，回卷到 0 重新累计（原位置 %ds）' % (name, st['head']))
-            self.report(job, dtoken, 0, isdrag=3)
+            # 有效时长是跨次累积的，回卷到 0 等于把已经攒的进度白扔。
+            # 从现有位置接着跑，位置到片尾后再补有效时长。
+            pt = min(dur, st['head'])
+            log('%s 续跑（已有位置 %ds/%ds）' % (name, pt, dur))
+            self.report(job, dtoken, pt, isdrag=3)
 
         step = int(self.gap * self.speed)
         last = time.time()
@@ -216,15 +220,41 @@ class Runner:
                 log('%s 完成' % name)
                 return True
 
-        for _ in range(2):
-            r = self.report(job, dtoken, dur, isdrag=4)
+        # 位置到片尾 ≠ 有效时长攒够。
+        # 服务端按「真实流逝时间」计有效时长：60 秒里推 90 秒，只有 60 秒算数。
+        # 所以推进越快，片尾欠的账越多——必须留在片尾继续平位上报，把差额补齐。
+        max_extra = int(dur / max(self.gap, 1)) + 5
+        extra = 0
+        while extra < max_extra:
+            r = self.report(job, dtoken, dur, isdrag=3)
+            extra += 1
             try:
                 if r.json().get('isPassed'):
-                    log('%s 完成（收尾）' % name)
+                    log('%s 完成（片尾补报 %d 次补足有效时长）' % (name, extra))
                     return True
             except Exception:
                 pass
-            time.sleep(4)
+            if self.blocked:
+                log('%s !! 等 5 分钟后重试' % name)
+                time.sleep(300)
+                self.blocked = False
+                continue
+            if extra % 3 == 0:
+                st = self.read_state(job)
+                if st and st['passed']:
+                    log('%s 完成（复核确认）' % name)
+                    return True
+                log('%s 片尾已补报 %d 次，有效时长仍不足' % (name, extra))
+            time.sleep(self.gap)
+
+        r = self.report(job, dtoken, dur, isdrag=4)
+        try:
+            if r.json().get('isPassed'):
+                log('%s 完成（收尾）' % name)
+                return True
+        except Exception:
+            pass
+        time.sleep(4)
         st2 = self.read_state(job)
         if st2 and st2['passed']:
             log('%s 完成（复核确认）' % name)

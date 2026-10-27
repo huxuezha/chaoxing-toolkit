@@ -23,7 +23,7 @@ _DEFAULTS = {
     'school': {'domain': 'ppsuc.edu.cn', 'name': '本校'},
     'chrome': {'port': 9223, 'profile': 'ChaoxingChrome2'},
     'api': {'key': '', 'base': 'https://api.educg.net/v1', 'model': 'deepseek-v4-flash'},
-    'video': {'speed': 1.5, 'gap': 60, 'workers': 2},
+    'video': {'speed': 1.0, 'gap': 60, 'workers': 3},
 }
 
 

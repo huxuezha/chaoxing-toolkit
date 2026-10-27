@@ -13,8 +13,8 @@
     "model": "deepseek-v4-flash"
   },
   "video": {
-    "speed": 1.5,
+    "speed": 1.0,
     "gap": 60,
-    "workers": 2
+    "workers": 3
   }
 }
