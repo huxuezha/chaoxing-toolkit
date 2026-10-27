@@ -1,0 +1,9 @@
+# 统一换行符，避免跨平台 diff 噪音
+* text=auto eol=lf
+
+# 明确标注二进制/大文件
+*.json  text eol=lf
+*.js    text eol=lf
+*.md    text eol=lf
+*.py    text eol=lf
+LICENSE text eol=lf
